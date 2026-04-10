@@ -18,37 +18,70 @@ import requests
 
 SAVE_DIR = Path("data/raw")
 
+# ── Toutes les dates déjà téléchargées (batch v1 + v2) ───────────────────────
 ALREADY_HAVE_TILES = {
+    # Batch v1 (originales)
     "T10SGH_20210720", "T10SGH_20210126", "T10SGH_20210921",
     "T10SFG_20210126", "T10SFG_20210926", "T10SFG_20210419", "T10SFG_20210723",
     "T10SFJ_20210723", "T10SFH_20210723",
     "T15SXU_20210927", "T15SXU_20210425", "T15SXU_20210118",
+    # Batch v2 (nouveaux)
+    "T10SFH_20210116", "T10SFG_20210327", "T10SGH_20210419",
+    "T10SFJ_20210814", "T10SFG_20210913", "T10SGH_20211016",
+    "T10SGH_20210504", "T10SFH_20210511", "T10SGH_20210809",
+    "T10SFH_20210911", "T10SFG_20211001", "T10SGH_20211210",
+    "T15SXU_20210304", "T15SXU_20210513", "T15SXU_20210803",
+    "T15SXU_20211025", "T15SXU_20211104",
 }
 
+# ── CALIFORNIA — dates manquantes ciblées (batch v3) ─────────────────────────
+# DOY actuels par tuile :
+#   SGH : 26,109,124,201,221,264,289,344   → manque juin(~165), nov(~308)
+#   SFG : 26,86,109,204,256,269,274,289    → manque juin(~165), nov(~308), déc(~344)
+#   SFH : 16,131,204,254                   → manque mars,avr,juin,oct,nov,déc
+#   SFJ : 204,226                          → très peu ! jan,mars,mai,juin,sept,oct,nov,déc
+
 TARGETS_CA = [
-    {"tile": "T10SGH", "date_start": "2021-03-01", "date_end": "2021-04-30", "max_cloud": 30},
-    {"tile": "T10SGH", "date_start": "2021-05-01", "date_end": "2021-06-30", "max_cloud": 30},
-    {"tile": "T10SGH", "date_start": "2021-08-01", "date_end": "2021-09-15", "max_cloud": 30},
-    {"tile": "T10SGH", "date_start": "2021-10-01", "date_end": "2021-11-30", "max_cloud": 30},
-    {"tile": "T10SGH", "date_start": "2021-12-01", "date_end": "2021-12-31", "max_cloud": 50},
-    {"tile": "T10SFG", "date_start": "2021-03-01", "date_end": "2021-04-15", "max_cloud": 30},
-    {"tile": "T10SFG", "date_start": "2021-05-01", "date_end": "2021-06-30", "max_cloud": 30},
-    {"tile": "T10SFG", "date_start": "2021-08-01", "date_end": "2021-09-15", "max_cloud": 30},
-    {"tile": "T10SFG", "date_start": "2021-10-01", "date_end": "2021-11-30", "max_cloud": 40},
-    {"tile": "T10SFH", "date_start": "2021-01-01", "date_end": "2021-03-31", "max_cloud": 40},
-    {"tile": "T10SFH", "date_start": "2021-04-01", "date_end": "2021-06-30", "max_cloud": 30},
-    {"tile": "T10SFH", "date_start": "2021-08-01", "date_end": "2021-10-31", "max_cloud": 30},
-    {"tile": "T10SFJ", "date_start": "2021-01-01", "date_end": "2021-03-31", "max_cloud": 40},
-    {"tile": "T10SFJ", "date_start": "2021-04-01", "date_end": "2021-06-30", "max_cloud": 30},
-    {"tile": "T10SFJ", "date_start": "2021-08-01", "date_end": "2021-10-31", "max_cloud": 30},
+    # ── SGH : juin + novembre ─────────────────────────────────────────────────
+    {"tile": "T10SGH", "date_start": "2021-06-01", "date_end": "2021-06-30", "max_cloud": 30},
+    {"tile": "T10SGH", "date_start": "2021-11-01", "date_end": "2021-11-30", "max_cloud": 40},
+    # ── SFG : juin + novembre + décembre ─────────────────────────────────────
+    {"tile": "T10SFG", "date_start": "2021-06-01", "date_end": "2021-06-30", "max_cloud": 30},
+    {"tile": "T10SFG", "date_start": "2021-11-01", "date_end": "2021-11-30", "max_cloud": 40},
+    {"tile": "T10SFG", "date_start": "2021-12-01", "date_end": "2021-12-31", "max_cloud": 50},
+    # ── SFH : mars, avril, juin, octobre, novembre, décembre ─────────────────
+    {"tile": "T10SFH", "date_start": "2021-03-01", "date_end": "2021-03-31", "max_cloud": 40},
+    {"tile": "T10SFH", "date_start": "2021-04-01", "date_end": "2021-04-30", "max_cloud": 30},
+    {"tile": "T10SFH", "date_start": "2021-06-01", "date_end": "2021-06-30", "max_cloud": 30},
+    {"tile": "T10SFH", "date_start": "2021-10-01", "date_end": "2021-10-31", "max_cloud": 30},
+    {"tile": "T10SFH", "date_start": "2021-11-01", "date_end": "2021-11-30", "max_cloud": 40},
+    {"tile": "T10SFH", "date_start": "2021-12-01", "date_end": "2021-12-31", "max_cloud": 50},
+    # ── SFJ : très peu de dates — priorité haute ─────────────────────────────
+    {"tile": "T10SFJ", "date_start": "2021-01-01", "date_end": "2021-01-31", "max_cloud": 50},
+    {"tile": "T10SFJ", "date_start": "2021-03-01", "date_end": "2021-03-31", "max_cloud": 40},
+    {"tile": "T10SFJ", "date_start": "2021-05-01", "date_end": "2021-05-31", "max_cloud": 30},
+    {"tile": "T10SFJ", "date_start": "2021-06-01", "date_end": "2021-06-30", "max_cloud": 30},
+    {"tile": "T10SFJ", "date_start": "2021-09-01", "date_end": "2021-09-30", "max_cloud": 30},
+    {"tile": "T10SFJ", "date_start": "2021-10-01", "date_end": "2021-10-31", "max_cloud": 30},
+    {"tile": "T10SFJ", "date_start": "2021-11-01", "date_end": "2021-11-30", "max_cloud": 40},
+    {"tile": "T10SFJ", "date_start": "2021-12-01", "date_end": "2021-12-31", "max_cloud": 50},
 ]
 
+# ── ARKANSAS — vide critique juin-juillet (DOY 133→215) ──────────────────────
+# DOY actuels : 18, 63, 115, 133, 215, 270, 298, 308
+# GAP CRITIQUE : aucune donnée entre 13 mai et 3 août
+# → juin et juillet = saison de croissance maïs/soja/coton/riz
+
 TARGETS_AR = [
-    {"tile": "T15SXU", "date_start": "2021-02-01", "date_end": "2021-03-31", "max_cloud": 40},
-    {"tile": "T15SXU", "date_start": "2021-05-01", "date_end": "2021-06-30", "max_cloud": 30},
-    {"tile": "T15SXU", "date_start": "2021-07-01", "date_end": "2021-08-31", "max_cloud": 40},
-    {"tile": "T15SXU", "date_start": "2021-10-01", "date_end": "2021-11-30", "max_cloud": 30},
-    {"tile": "T15SXU", "date_start": "2021-11-01", "date_end": "2021-12-31", "max_cloud": 40},
+    # ── PRIORITÉ ABSOLUE : juin et juillet découpés en 2 pour avoir 2 chances ─
+    {"tile": "T15SXU", "date_start": "2021-06-01", "date_end": "2021-06-15", "max_cloud": 40},
+    {"tile": "T15SXU", "date_start": "2021-06-16", "date_end": "2021-06-30", "max_cloud": 40},
+    {"tile": "T15SXU", "date_start": "2021-07-01", "date_end": "2021-07-15", "max_cloud": 50},
+    {"tile": "T15SXU", "date_start": "2021-07-16", "date_end": "2021-07-31", "max_cloud": 50},
+    # ── Compléments ────────────────────────────────────────────────────────────
+    {"tile": "T15SXU", "date_start": "2021-02-01", "date_end": "2021-02-28", "max_cloud": 40},
+    {"tile": "T15SXU", "date_start": "2021-08-01", "date_end": "2021-08-15", "max_cloud": 50},
+    {"tile": "T15SXU", "date_start": "2021-12-01", "date_end": "2021-12-31", "max_cloud": 50},
 ]
 
 TARGETS_ALL = TARGETS_CA + TARGETS_AR
@@ -81,13 +114,10 @@ def maybe_refresh(username, password, token, token_time):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# RECHERCHE — filtre OData minimal (fix 400 Bad Request)
-# Le bug venait du $orderby avec any() non supporté par CDSE.
-# On utilise un filtre simple + tri Python local.
+# RECHERCHE
 # ─────────────────────────────────────────────────────────────────────────────
 
 def search_products(tile, date_start, date_end, max_cloud):
-    # Filtre simplifié : pas de $orderby complexe, pas de OData.CSC.Intersects
     filter_str = (
         f"Collection/Name eq 'SENTINEL-2' "
         f"and contains(Name,'{tile}') "
@@ -104,8 +134,7 @@ def search_products(tile, date_start, date_end, max_cloud):
     resp = requests.get(SEARCH_URL, params=params, timeout=30)
 
     if resp.status_code == 400:
-        # Dernier recours : filtre ultra-minimal
-        print(f"    ⚠️  Filtre standard 400, essai filtre minimal...")
+        print(f"    Filtre standard 400, essai filtre minimal...")
         filter_str = (
             f"Collection/Name eq 'SENTINEL-2' "
             f"and contains(Name,'{tile}') "
@@ -118,7 +147,6 @@ def search_products(tile, date_start, date_end, max_cloud):
     resp.raise_for_status()
     products = resp.json().get("value", [])
 
-    # Filtrer L2A et couverture nuageuse côté Python
     result = []
     for p in products:
         name = p.get("Name", "")
@@ -205,6 +233,18 @@ def main():
     print(f"  Dossier : {SAVE_DIR.resolve()}")
     print(f"  Mode    : {'DRY RUN' if args.dry_run else 'TELECHARGEMENT REEL'}\n")
 
+    # Résumé des lacunes
+    print("Lacunes a combler :")
+    if args.region in ("ca", "all"):
+        print("  [CA] SGH : juin, nov")
+        print("  [CA] SFG : juin, nov, dec")
+        print("  [CA] SFH : mars, avr, juin, oct, nov, dec")
+        print("  [CA] SFJ : jan, mars, mai, juin, sept, oct, nov, dec  ← priorite haute")
+    if args.region in ("ar", "all"):
+        print("  [AR] SXU : JUIN + JUILLET  ← GAP CRITIQUE saison de croissance")
+        print("  [AR] SXU : fev, aout, dec  ← complements")
+    print()
+
     print("Authentification...")
     try:
         token      = get_token(args.user, args.password)
@@ -226,21 +266,20 @@ def main():
             continue
 
         if not products:
-            print(f"  AUCUN  {tile} [{d_s[:7]}->{d_e[:7]}]  (essayez max_cloud={cloud+20}%)")
+            print(f"  AUCUN  {tile} [{d_s[5:7]}/{d_s[:4]}]  nuages<={cloud}%")
             continue
 
         best = products[0]
         name = best["Name"]
         cc   = best["_cc"]
 
-        # Vérifier si déjà présent sur disque ou dans ALREADY_HAVE
-        on_disk  = bool(list(SAVE_DIR.glob(f"*{name[:35]}*.SAFE")))
-        in_have  = any(f"{tile}_{name[11:19]}" in h for h in ALREADY_HAVE_TILES)
+        on_disk = bool(list(SAVE_DIR.glob(f"*{name[:35]}*.SAFE")))
+        in_have = any(f"{tile}_{name[11:19]}" in h for h in ALREADY_HAVE_TILES)
 
         if on_disk or in_have:
-            print(f"  [OK]   {tile} [{d_s[:7]}]  nuages={cc:.0f}%  deja present")
+            print(f"  [OK]   {tile} [{d_s[5:7]}/{d_s[:4]}]  nuages={cc:.0f}%  deja present  ({name[11:19]})")
         else:
-            print(f"  [DL]   {tile} [{d_s[:7]}]  nuages={cc:.0f}%  → {name[:55]}...")
+            print(f"  [DL]   {tile} [{d_s[5:7]}/{d_s[:4]}]  nuages={cc:.0f}%  {name[11:19]}  → {name[:55]}...")
             to_download.append(best)
 
     print(f"\n{len(to_download)} nouveaux produits a telecharger")
@@ -250,17 +289,18 @@ def main():
         if to_download:
             print("\nProduits qui seraient telecharges :")
             for p in to_download:
-                print(f"  {p['Name'][:70]}")
-        print(f"\nPour lancer : python download_sentinel2.py --user {args.user} --password *** --region {args.region}")
+                print(f"  {p['Name'][11:19]}  nuages={p['_cc']:.0f}%  {p['Name'][:70]}")
+        print(f"\nPour lancer :")
+        print(f"  python download_sentinel2.py --user {args.user} --password *** --region {args.region}")
         return
 
     if not to_download:
-        print("Tout est deja present.")
+        print("Tout est deja present — relance la cellule 4 du notebook.")
         return
 
     ok, fail = [], []
     for i, product in enumerate(to_download, 1):
-        print(f"\n[{i}/{len(to_download)}] {product['Name'][:65]}")
+        print(f"\n[{i}/{len(to_download)}] {product['Name'][:65]}  (nuages={product['_cc']:.0f}%)")
         token, token_time = maybe_refresh(args.user, args.password, token, token_time)
         path = download_product(product["Id"], product["Name"], token, SAVE_DIR)
         (ok if path else fail).append(product["Name"])
@@ -270,36 +310,13 @@ def main():
     print("\n" + "=" * 60)
     print(f"  OK : {len(ok)}  |  ECHECS : {len(fail)}")
     if ok:
-        print("\nTelecharges :")
-        for n in ok:
-            print(f"  {n}")
+        print(f"\n{len(ok)} fichiers telecharges.")
+        print("Relance la cellule 4 du notebook — les nouveaux .SAFE sont detectes automatiquement.")
     if fail:
-        print("\nEchecs :")
+        print("\nEchecs (reessaie avec max_cloud plus eleve) :")
         for n in fail:
             print(f"  {n}")
-
-    print("""
-======================================================
-  SUITE : mettre a jour DATES_MAP dans le notebook
-======================================================
-  Pour chaque nouveau .SAFE telecharge, ajouter dans
-  DATES_MAP_CA ou DATES_MAP_AR :
-
-  'nom_date': (
-      'NOM_FICHIER.SAFE',
-      'L2A_TXXX_...',       # dossier dans .SAFE/GRANULE/
-      'TXXX_YYYYMMDDTXXXXXX',  # prefixe des bandes jp2
-      'SGH',                   # zone : SGH / SFH / SFG / SFJ / SXU
-  ),
-""")
 
 
 if __name__ == "__main__":
     main()
-
-# pip install requests
-#python download_sentinel2.py --user ton@email.com --password TON_MDP --dry-run
-# D'abord l'Arkansas (seulement 4 dates → priorité absolue)
-#python download_sentinel2.py --user ton@email.com --password TON_MDP --region ar
-# Ensuite la California
-#python download_sentinel2.py --user ton@email.com --password TON_MDP --region ca    
